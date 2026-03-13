@@ -18,6 +18,9 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN;
 app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json({ limit: '16kb' })); // guard against large payloads
 
+// ─── Health Check (required by Render) ──────────────────────────────────────
+app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
+
 // ─── API Routes ──────────────────────────────────────────────────────────────
 app.use('/api/rooms', roomsRouter);
 app.use('/api/messages', messagesRouter);
@@ -162,6 +165,8 @@ process.on('unhandledRejection', (reason) => {
 });
 process.on('uncaughtException', (err) => {
   console.error('[Process] Uncaught exception:', err);
+  // Only exit on truly fatal errors; log and continue for recoverable ones
+  if (err.code === 'ERR_USE_AFTER_CLOSE' || err.code === 'ECONNRESET') return;
   process.exit(1);
 });
 
@@ -174,8 +179,8 @@ mongoose
   .then(() => {
     console.log('[MongoDB] Connected successfully.');
     startCleanupJob();
-    server.listen(PORT, () => {
-      console.log(`[Server] Bok-Bok API running on http://localhost:${PORT}`);
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`[Server] Bok-Bok API running on port ${PORT}`);
     });
   })
   .catch((err) => {
